@@ -20,6 +20,7 @@
 # include <getopt.h>
 # include <string.h>
 # include <errno.h>
+# include <bsd/string.h>
 
 # define MAXLEN 256
 

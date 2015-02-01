@@ -1,7 +1,7 @@
 #!/bin/bash
 
-EXECDIR="./src/Release"
-EXECNAME="HeatedPlate"
+EXECDIR="./Release"
+EXECNAME="Heated_Plate_2D"
 
 MAXRUN=5
 MAXSIZE=1025
