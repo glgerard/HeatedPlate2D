@@ -17,24 +17,14 @@
 
 #include "HeatedPlate2D.h"
 
-double GaussSeidel(double **u, int m, int n, double eps,
-		int iterations_print, int* iterations, double* wtime) {
+double GaussSeidelV1(double **u, int m, int n, double eps,
+		int iterations_print, int* iterations) {
 	int i, j;
 	double diff;
 	double v;
 
 	diff = eps;
 
-	/*
-     * iterate until the  error is less than the tolerance.
-	 */
-	*iterations = 0;
-
-	printf ( "\n" );
-	printf ( " Iteration  Change\n" );
-	printf ( "\n" );
-
-	*wtime = omp_get_wtime();
 	while (eps <= diff) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
@@ -57,6 +47,29 @@ double GaussSeidel(double **u, int m, int n, double eps,
 			iterations_print = 2 * iterations_print;
 		}
 	}
-	*wtime = omp_get_wtime() - *wtime;
 	return diff;
+}
+
+double GaussSeidel(double **u, int m, int n, int sqrerr, double eps,
+		int iterations_print, int* iterations, double* wtime) {
+	int i, j;
+	double err;
+	double v;
+
+	/*
+     * iterate until the  error is less than the tolerance.
+	 */
+	*iterations = 0;
+
+	printf ( "\n" );
+	printf ( " Iteration  Change\n" );
+	printf ( "\n" );
+
+	*wtime = omp_get_wtime();
+	if (sqrerr == 0)
+		err = GaussSeidelV1(u,m,n,eps,iterations_print, iterations);
+	else
+		err = -1.0;
+	*wtime = omp_get_wtime() - *wtime;
+	return err;
 }
