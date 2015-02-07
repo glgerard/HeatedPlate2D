@@ -52,9 +52,7 @@ double GaussSeidelV1(double **u, int m, int n, double eps,
 
 double GaussSeidel(double **u, int m, int n, int sqrerr, double eps,
 		int iterations_print, int* iterations, double* wtime) {
-	int i, j;
 	double err;
-	double v;
 
 	/*
      * iterate until the  error is less than the tolerance.

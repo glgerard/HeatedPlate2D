@@ -96,7 +96,9 @@ double RB_GS_OmpLoopV1(double** black, double** red, int m, int n, double eps,
 						my_diff = fabs(v - black[i][j]);
 					black[i][j] = v;
 				}
-
+			if (diff < my_diff)
+#pragma omp atomic write
+				diff = my_diff;
 			/*
 			 * Red sweep
 			 */
@@ -108,8 +110,8 @@ double RB_GS_OmpLoopV1(double** black, double** red, int m, int n, double eps,
 						my_diff = fabs(v - red[i][j]);
 					red[i][j] = v;
 				}
-#pragma omp critical
 			if (diff < my_diff)
+#pragma omp atomic write
 				diff = my_diff;
 		} /* end parallel */
 
@@ -190,9 +192,9 @@ double RB_GS_OmpLoopV2(double** black, double** red, int m, int n, double eps,
 			/*
 			 * Determine the new estimate of the solution at the interior points.
 			 */
-#pragma omp master
+#pragma omp critical (diff_update)
 			max_diff = 0.0;
-#pragma omp barrier
+// #pragma omp barrier
 			my_diff = 0.0;
 			/*
 			 * Black sweep
@@ -205,6 +207,11 @@ double RB_GS_OmpLoopV2(double** black, double** red, int m, int n, double eps,
 						my_diff = fabs(v - black[i][j]);
 					black[i][j] = v;
 				}
+
+			if (max_diff < my_diff)
+#pragma omp critical (diff_update)
+				max_diff = my_diff;
+
 			/*
 			 * Red sweep
 			 */
@@ -217,15 +224,17 @@ double RB_GS_OmpLoopV2(double** black, double** red, int m, int n, double eps,
 					red[i][j] = v;
 				}
 
-#pragma omp critical (diff_update)
 				if (max_diff < my_diff)
+#pragma omp critical (diff_update)
 					max_diff = my_diff;
 
-#pragma omp barrier
+#pragma omp single
+				diff = max_diff;
+
+// #pragma omp barrier
 
 #pragma omp master
 			{
-				diff = max_diff;
 				(*iterations)++;
 				if (*iterations == iterations_print) {
 					printf("  %8d  %f\n", *iterations, diff);
@@ -276,10 +285,10 @@ double RB_GS_OmpLoopV2err(double** black, double** red, int m, int n, double eps
 					red[i][j] = v;
 				}
 
-#pragma omp master
+#pragma omp single
 			error = sqrt(error)/(m*n);
 
-#pragma omp barrier
+// #pragma omp barrier
 
 #pragma omp master
 			{
@@ -343,9 +352,9 @@ double RB_GS_OmpLoopV3(double** black, double** red, int m, int n, double eps,
 					red[i][j] = v;
 				}
 
-#pragma omp barrier
+// #pragma omp barrier
 
-#pragma omp master
+#pragma omp single
 			{
 				max_diff = 0.0;
 				for(j = 0; j < nthreads; j++)
@@ -353,7 +362,7 @@ double RB_GS_OmpLoopV3(double** black, double** red, int m, int n, double eps,
 						max_diff = diff[j];
 			}
 
-#pragma omp barrier
+// #pragma omp barrier
 
 #pragma omp master
 			{
@@ -418,16 +427,16 @@ double RB_GS_OmpLoopV3err(double** black, double** red, int m, int n, double eps
 					red[i][j] = v;
 				}
 
-#pragma omp barrier
+// #pragma omp barrier
 
-#pragma omp master
+#pragma omp single
 			{
 				for(j = 0; j < nthreads; j++)
 						error += my_error[j];
 				error = sqrt(error)/(n*m);
 			}
 
-#pragma omp barrier
+// #pragma omp barrier
 
 #pragma omp master
 			{
@@ -444,6 +453,158 @@ double RB_GS_OmpLoopV3err(double** black, double** red, int m, int n, double eps
 
 	return error;
 }
+
+double RB_GS_OmpLoopV4(double** black, double** red, int m, int n, double eps,
+		int iterations_print, int* iterations) {
+	int i, j;
+	double diff, my_diff;
+	double v;
+
+	diff = eps;
+
+	/*
+     * iterate until the  error is less than the tolerance.
+	 */
+	while (eps <= diff) {
+		/*
+		 * Determine the new estimate of the solution at the interior points.
+		 */
+		diff = 0.0;
+
+#pragma omp parallel private(j, v, my_diff)
+		{
+			my_diff = 0.0;
+			/*
+			 * Black sweep
+			 */
+#pragma omp for
+			for (i = 1; i < m - 1; i++)
+				for (j = i%2; j < n/2 - (i+1)%2; j++) {
+					v = (red[i - 1][j] + red[i + 1][j] + red[i][j - i%2] + red[i][j + (i+1)%2]) / 4.0;
+					black[i][j] = v;
+				}
+			/*
+			 * Red sweep
+			 */
+#pragma omp for
+			for (i = 1; i < m - 1; i++)
+				for (j = (i+1)%2; j < n/2 - i%2; j++) {
+					v = (black[i - 1][j] + black[i + 1][j] + black[i][j - (i+1)%2] + black[i][j + i%2]) / 4.0;
+					red[i][j] = v;
+				}
+			/*
+			 * Second iteration
+			 * Black sweep
+			 */
+#pragma omp for
+			for (i = 1; i < m - 1; i++)
+				for (j = i%2; j < n/2 - (i+1)%2; j++) {
+					v = (red[i - 1][j] + red[i + 1][j] + red[i][j - i%2] + red[i][j + (i+1)%2]) / 4.0;
+					if (my_diff < fabs(v - black[i][j]))
+						my_diff = fabs(v - black[i][j]);
+					black[i][j] = v;
+				}
+			if (diff < my_diff)
+#pragma omp atomic write
+				diff = my_diff;
+			/*
+			 * Second iteration
+			 * Red sweep
+			 */
+#pragma omp for
+			for (i = 1; i < m - 1; i++)
+				for (j = (i+1)%2; j < n/2 - i%2; j++) {
+					v = (black[i - 1][j] + black[i + 1][j] + black[i][j - (i+1)%2] + black[i][j + i%2]) / 4.0;
+					if (my_diff < fabs(v - red[i][j]))
+						my_diff = fabs(v - red[i][j]);
+					red[i][j] = v;
+				}
+			if (diff < my_diff)
+#pragma omp atomic write
+				diff = my_diff;
+		} /* end parallel */
+
+		*iterations += 2;
+		if (*iterations >> 1 == iterations_print) {
+			printf("  %8d  %f\n", *iterations, diff);
+			iterations_print = 2 * iterations_print;
+		}
+	} /* end while */
+	return diff;
+}
+
+double RB_GS_OmpLoopV4err(double** black, double** red, int m, int n, double eps,
+		int iterations_print, int* iterations) {
+	int i, j;
+	double v;
+	double error;
+
+	error = 10.0*eps;
+
+	/*
+     * iterate until the  error is less than the tolerance.
+	 */
+	while (error > eps) {
+		/*
+		 * Determine the new estimate of the solution at the interior points.
+		 */
+#pragma omp parallel private(j, v)
+		{
+			/*
+			 * Black sweep
+			 */
+#pragma omp for reduction(+:error)
+			for (i = 1; i < m - 1; i++)
+				for (j = i%2; j < n/2 - (i+1)%2; j++) {
+					v = (red[i - 1][j] + red[i + 1][j] + red[i][j - i%2] + red[i][j + (i+1)%2]) / 4.0;
+					black[i][j] = v;
+				}
+
+			/*
+			 * Red sweep
+			 */
+#pragma omp for reduction(+:error)
+			for (i = 1; i < m - 1; i++)
+				for (j = (i+1)%2; j < n/2 - i%2; j++) {
+					v = (black[i - 1][j] + black[i + 1][j] + black[i][j - (i+1)%2] + black[i][j + i%2]) / 4.0;
+					red[i][j] = v;
+				}
+			/*
+			 * Second iteration
+			 * Black sweep
+			 */
+#pragma omp for reduction(+:error)
+			for (i = 1; i < m - 1; i++)
+				for (j = i%2; j < n/2 - (i+1)%2; j++) {
+					v = (red[i - 1][j] + red[i + 1][j] + red[i][j - i%2] + red[i][j + (i+1)%2]) / 4.0;
+					error += (v - black[i][j])*(v - black[i][j]);
+					black[i][j] = v;
+				}
+
+			/*
+			 * Second iteration
+			 * Red sweep
+			 */
+#pragma omp for reduction(+:error)
+			for (i = 1; i < m - 1; i++)
+				for (j = (i+1)%2; j < n/2 - i%2; j++) {
+					v = (black[i - 1][j] + black[i + 1][j] + black[i][j - (i+1)%2] + black[i][j + i%2]) / 4.0;
+					error += (v - red[i][j])*(v - red[i][j]);
+					red[i][j] = v;
+				}
+		} /* end parallel */
+
+		error = sqrt(error)/(m*n);
+		*iterations += 2;
+
+		if (*iterations >> 1 == iterations_print) {
+			printf("  %8d  %f\n", *iterations, error);
+			iterations_print = 2 * iterations_print;
+		}
+	} /* end while */
+	return error;
+}
+
 
 double RedBlack_GaussSeidel(double **u, int m, int n, double eps, int omp, int sqrerr, int version,
 		int iterations_print, int* iterations, double* wtime) {
@@ -499,6 +660,9 @@ double RedBlack_GaussSeidel(double **u, int m, int n, double eps, int omp, int s
 			case 3:
 				err = RB_GS_OmpLoopV3(black, red, m, n, eps, iterations_print, iterations);
 				break;
+			case 4:
+				err = RB_GS_OmpLoopV4(black, red, m, n, eps, iterations_print, iterations);
+				break;
 			default:
 				err = -1.0;
 				break;
@@ -516,6 +680,9 @@ double RedBlack_GaussSeidel(double **u, int m, int n, double eps, int omp, int s
 				break;
 			case 3:
 				err = RB_GS_OmpLoopV3err(black, red, m, n, eps, iterations_print, iterations);
+				break;
+			case 4:
+				err = RB_GS_OmpLoopV4err(black, red, m, n, eps, iterations_print, iterations);
 				break;
 			default:
 				err = -1.0;

@@ -11,7 +11,7 @@
 # define M 8192
 # define N 8192
 
-# define NVERSIONS 3
+# define NVERSIONS 4
 
 double **CreateGrid(int m, int n);
 

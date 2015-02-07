@@ -20,7 +20,9 @@
 # include <getopt.h>
 # include <string.h>
 # include <errno.h>
+#ifdef __linux__
 # include <bsd/string.h>
+#endif
 
 # define MAXLEN 256
 
@@ -171,11 +173,13 @@ int main ( int argc, char *argv[] )
         printf ("\n");
     }
 
-    if (epsilon == 0.0)
+    if (epsilon == 0.0) {
     	if (sqrerr == 0)
     		epsilon = 0.001;
     	else
     		epsilon = 0.000001;
+    }
+
     /*
      * If an output file is provided it will store the outcome U in that file.
      */
