@@ -178,23 +178,21 @@ double RB_GS_OmpLoopV1err(double** black, double** red, int m, int n, double eps
 double RB_GS_OmpLoopV2(double** black, double** red, int m, int n, double eps,
 		int iterations_print, int* iterations) {
 	int i, j;
-	double diff, my_diff, max_diff;
+	double diff, my_diff;
 	double v;
 
-	diff = eps;
+	my_diff = eps;
 
 	/*
      * iterate until the  error is less than the tolerance.
 	 */
-#pragma omp parallel private(j, v, my_diff)
+#pragma omp parallel private(j, v) firstprivate(my_diff)
 	{
-		while (eps <= diff) {
+		while (eps <= my_diff) {
 			/*
 			 * Determine the new estimate of the solution at the interior points.
 			 */
-#pragma omp critical (diff_update)
-			max_diff = 0.0;
-// #pragma omp barrier
+			diff = 0.0;
 			my_diff = 0.0;
 			/*
 			 * Black sweep
@@ -208,9 +206,9 @@ double RB_GS_OmpLoopV2(double** black, double** red, int m, int n, double eps,
 					black[i][j] = v;
 				}
 
-			if (max_diff < my_diff)
-#pragma omp critical (diff_update)
-				max_diff = my_diff;
+			if (diff < my_diff)
+#pragma omp atomic write
+				diff = my_diff;
 
 			/*
 			 * Red sweep
@@ -224,16 +222,13 @@ double RB_GS_OmpLoopV2(double** black, double** red, int m, int n, double eps,
 					red[i][j] = v;
 				}
 
-				if (max_diff < my_diff)
+				if (diff < my_diff)
 #pragma omp critical (diff_update)
-					max_diff = my_diff;
+					diff = my_diff;
+
+				my_diff = diff;
 
 #pragma omp single
-				diff = max_diff;
-
-// #pragma omp barrier
-
-#pragma omp master
 			{
 				(*iterations)++;
 				if (*iterations == iterations_print) {
@@ -241,7 +236,6 @@ double RB_GS_OmpLoopV2(double** black, double** red, int m, int n, double eps,
 					iterations_print = 2 * iterations_print;
 				}
 			}
-#pragma omp barrier
 		} /* end while */
 	} /* end parallel */
 	return diff;
@@ -286,12 +280,9 @@ double RB_GS_OmpLoopV2err(double** black, double** red, int m, int n, double eps
 				}
 
 #pragma omp single
-			error = sqrt(error)/(m*n);
-
-// #pragma omp barrier
-
-#pragma omp master
 			{
+				error = sqrt(error)/(m*n);
+
 				(*iterations)++;
 				if (*iterations == iterations_print) {
 					printf("  %8d  %f\n", *iterations, error);
@@ -352,8 +343,6 @@ double RB_GS_OmpLoopV3(double** black, double** red, int m, int n, double eps,
 					red[i][j] = v;
 				}
 
-// #pragma omp barrier
-
 #pragma omp single
 			{
 				max_diff = 0.0;
@@ -361,8 +350,6 @@ double RB_GS_OmpLoopV3(double** black, double** red, int m, int n, double eps,
 					if (diff[j] > max_diff)
 						max_diff = diff[j];
 			}
-
-// #pragma omp barrier
 
 #pragma omp master
 			{
@@ -427,16 +414,12 @@ double RB_GS_OmpLoopV3err(double** black, double** red, int m, int n, double eps
 					red[i][j] = v;
 				}
 
-// #pragma omp barrier
-
 #pragma omp single
 			{
 				for(j = 0; j < nthreads; j++)
 						error += my_error[j];
 				error = sqrt(error)/(n*m);
 			}
-
-// #pragma omp barrier
 
 #pragma omp master
 			{

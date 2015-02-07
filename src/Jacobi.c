@@ -157,23 +157,21 @@ double JacobiOmpLoopV2(double** up, double** wp, int m, int n,
 	int j;
 	double **t;
 	double diff;
-	double my_diff, max_diff;
+	double my_diff;
 
-	diff = eps;
+	my_diff = eps;
 
 	/*
      * iterate until the  error is less than the tolerance.
 	 */
-#pragma omp parallel private (j, my_diff)
+#pragma omp parallel private (j) firstprivate(my_diff)
 	{
-		while (eps <= diff) {
+		while (eps <= my_diff) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
 		 * The new solution W is the average of north, south, east and west neighbors.
 		 */
-#pragma omp critical (diff_update)
-			max_diff = 0.0;
-// #pragma omp barrier
+			diff = 0.0;
 			my_diff = 0.0;
 #pragma omp for schedule(static)
 			for (i = 1; i < m - 1; i++) {
@@ -189,6 +187,10 @@ double JacobiOmpLoopV2(double** up, double** wp, int m, int n,
 			printf("tid = %d, my_diff = %g\n", omp_get_thread_num(), my_diff);
 #endif
 
+			if (diff < my_diff)
+#pragma omp atomic write
+				diff = my_diff;
+
 #pragma omp single
 			{
 				/*
@@ -198,35 +200,22 @@ double JacobiOmpLoopV2(double** up, double** wp, int m, int n,
 				t = up;
 				up = wp;
 				wp = t;
-			} /* end single */
+			} /* end single, implicit barrier */
 
 #ifdef __DEBUG
 			printf("tid = %d, diff = %g\n", omp_get_thread_num(), diff);
 #endif
 
-			if (max_diff < my_diff)
-#pragma omp critical (diff_update)
-				max_diff = my_diff;
-
-#pragma omp barrier
-
-#ifdef __DEBUG
-			printf("tid = %d, diff = %g\n", omp_get_thread_num(), diff);
-#endif
+			my_diff = diff;
 
 #pragma omp single
-			diff = max_diff;
-
-// #pragma omp barrier
-
-#pragma omp master
 			{
 				(*iterations)++;
 				if (*iterations == iterations_print) {
 					printf("  %8d  %f\n", *iterations, diff);
 					iterations_print = 2 * iterations_print;
 				}
-			} /* end master */
+			} /* end single, implicit barrier */
 		} /* end while */
 	} /* end parallel */
 	return diff;
@@ -274,22 +263,16 @@ double JacobiOmpLoopV2err(double** up, double** wp, int m, int n,
 				t = up;
 				up = wp;
 				wp = t;
-			} /* end single */
 
-// #pragma omp barrier
-
-#ifdef __DEBUG
-			printf("tid = %d, diff = %g\n", omp_get_thread_num(), error);
-#endif
-
-#pragma omp master
-			{
 				(*iterations)++;
 				if (*iterations == iterations_print) {
 					printf("  %8d  %f\n", *iterations, error);
 					iterations_print = 2 * iterations_print;
 				}
-			} /* end master */
+			} /* end single, implicit barrier */
+#ifdef __DEBUG
+			printf("tid = %d, diff = %g\n", omp_get_thread_num(), error);
+#endif
 		} /* end while */
 	} /* end parallel */
 	return error;
@@ -336,8 +319,6 @@ double JacobiOmpLoopV3(double** up, double** wp, int m, int n,
 			printf("tid = %d, diff = %g\n", tid, diff[tid]);
 #endif
 
-// #pragma omp barrier
-
 #pragma omp single
 			{
 				/*
@@ -352,9 +333,7 @@ double JacobiOmpLoopV3(double** up, double** wp, int m, int n,
 				for(j = 0; j < nthreads; j++)
 					if (diff[j] > max_diff)
 						max_diff = diff[j];
-			} /* end single */
-
-// #pragma omp barrier
+			} /* end single, implicit barrier */
 
 #ifdef __DEBUG
 			printf("tid = %d, diff = %g\n", tid, max_diff);
@@ -429,9 +408,7 @@ double JacobiOmpLoopV3err(double** up, double** wp, int m, int n,
 				for(j = 0; j < nthreads; j++)
 						error += my_error[j];
 				error = sqrt(error)/(n*m);
-			} /* end master */
-
-#pragma omp barrier
+			} /* end single, implicit barrier */
 
 #ifdef __DEBUG
 //			printf("tid = %d, diff = %g\n", tid, my_error[tid]);
