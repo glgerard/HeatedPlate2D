@@ -19,18 +19,18 @@
 #include "HeatedPlate2D.h"
 
 double JacobiSeqLoop(double** up, double** wp, int m, int n,
-		double eps, int iterations_print, int* iterations) {
+		double eps, int maxit, int iterations_print, int* iterations) {
 	int i;
 	int j;
 	double **t;
-	double diff;
 
-	diff = eps;
+	double diff = eps;
 
 	/*
-     * iterate until the  error is less than the tolerance.
+     * Iterate until the  error is less than the tolerance or
+     * we reach the maximum number of iterations.
 	 */
-	while (eps <= diff) {
+	while (eps <= diff && (*iterations) < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
 		 * The new solution W is the average of north, south, east and west neighbors.
@@ -52,27 +52,73 @@ double JacobiSeqLoop(double** up, double** wp, int m, int n,
 		up = wp;
 		wp = t;
 		(*iterations)++;
+#ifdef __VERBOSE
 		if (*iterations == iterations_print) {
 			printf("  %8d  %f\n", *iterations, diff);
 			iterations_print = 2 * iterations_print;
 		}
+#endif
 	}
 	return diff;
 }
 
-double JacobiOmpLoopV1(double** up, double** wp, int m, int n,
-		double eps, int iterations_print, int* iterations) {
+double JacobiSeqLoopErr(double** up, double** wp, int m, int n,
+		double eps, int maxit, int iterations_print, int* iterations) {
 	int i;
 	int j;
 	double **t;
-	double diff, my_diff;
 
-	diff = eps;
+	double error = 10.0*eps;
 
 	/*
-     * iterate until the  error is less than the tolerance.
+     * Iterate until the  error is less than the tolerance or
+     * we reach the maximum number of iterations.
 	 */
-	while (eps <= diff) {
+	while (error >= eps && (*iterations) < maxit) {
+		/*
+		 * Determine the new estimate of the solution at the interior points.
+		 * The new solution W is the average of north, south, east and west neighbors.
+		 */
+		for (i = 1; i < m - 1; i++) {
+			for (j = 1; j < n - 1; j++) {
+				wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
+						+ up[i][j + 1]) / 4.0;
+				error += (wp[i][j] - up[i][j])*(wp[i][j] - up[i][j]);
+			}
+		}
+		/*
+		 * Swap wp and up so that at the next iteration up points to the new
+		 * solution.
+		 */
+		t = up;
+		up = wp;
+		wp = t;
+		(*iterations)++;
+		error = sqrt(error)/(m*n);
+#ifdef __VERBOSE
+		if (*iterations == iterations_print) {
+			printf("  %8d  %f\n", *iterations, diff);
+			iterations_print = 2 * iterations_print;
+		}
+#endif
+	}
+	return error;
+}
+
+double JacobiOmpLoopV1(double** up, double** wp, int m, int n,
+		double eps, int maxit, int iterations_print, int* iterations) {
+	int i;
+	int j;
+	double **t;
+	double my_diff;
+
+	double diff = eps;
+
+	/*
+     * Iterate until the  error is less than the tolerance or
+     * we reach the maximum number of iterations.
+	 */
+	while (eps <= diff && (*iterations) < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
 		 * The new solution W is the average of north, south, east and west neighbors.
@@ -81,7 +127,8 @@ double JacobiOmpLoopV1(double** up, double** wp, int m, int n,
 #pragma omp parallel private (j, my_diff)
 		{
 			my_diff = 0.0;
-#pragma omp for
+
+#pragma omp for schedule(OMP_SCHEDULING)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
 					wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
@@ -90,6 +137,8 @@ double JacobiOmpLoopV1(double** up, double** wp, int m, int n,
 						my_diff = fabs(wp[i][j] - up[i][j]);
 				}
 			}
+// implicit barrier
+
 			if (diff < my_diff)
 #pragma omp atomic write
 				diff = my_diff;
@@ -102,31 +151,33 @@ double JacobiOmpLoopV1(double** up, double** wp, int m, int n,
 		up = wp;
 		wp = t;
 		(*iterations)++;
+#ifdef __VERBOSE
 		if (*iterations == iterations_print) {
 			printf("  %8d  %f\n", *iterations, diff);
 			iterations_print = 2 * iterations_print;
 		}
+#endif
 	}
 	return diff;
 }
 
 double JacobiOmpLoopV1err(double** up, double** wp, int m, int n,
-		double eps, int iterations_print, int* iterations) {
+		double eps, int maxit, int iterations_print, int* iterations) {
 	int i;
 	int j;
 	double **t;
-	double error;
+	double error = 10.0*eps;
 
 	/*
-     * iterate until the  error is less than the tolerance.
+     * Iterate until the  error is less than the tolerance or
+     * we reach the maximum number of iterations.
 	 */
-	error = 10.0*eps;
-	while (error >= eps) {
+	while (error >= eps && (*iterations) < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
 		 * The new solution W is the average of north, south, east and west neighbors.
 		 */
-#pragma omp parallel for private(j) reduction(+:error)
+#pragma omp parallel for schedule(OMP_SCHEDULING) private(j) reduction(+:error)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
 					wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
@@ -134,6 +185,8 @@ double JacobiOmpLoopV1err(double** up, double** wp, int m, int n,
 					error += (wp[i][j] - up[i][j])*(wp[i][j] - up[i][j]);
 				}
 			}
+// implicit barrier
+
 		/*
 		 * Swap wp and up so that at the next iteration up points to the new
 		 * solution.
@@ -143,37 +196,41 @@ double JacobiOmpLoopV1err(double** up, double** wp, int m, int n,
 		wp = t;
 		(*iterations)++;
 		error = sqrt(error)/(m*n);
+#ifdef __VERBOSE
 		if (*iterations == iterations_print) {
 			printf("  %8d  %f\n", *iterations, error);
 			iterations_print = 2 * iterations_print;
 		}
+#endif
 	}
 	return error;
 }
 
 double JacobiOmpLoopV2(double** up, double** wp, int m, int n,
-		double eps, int iterations_print, int* iterations) {
+		double eps, int maxit, int iterations_print, int* iterations) {
 	int i;
 	int j;
 	double **t;
 	double diff;
 	double my_diff;
+	int my_iterations = *iterations;
 
 	my_diff = eps;
 
-	/*
-     * iterate until the  error is less than the tolerance.
-	 */
-#pragma omp parallel private (j) firstprivate(my_diff)
+#pragma omp parallel private (j) firstprivate(my_iterations, my_diff)
 	{
-		while (eps <= my_diff) {
+		/*
+	     * Iterate until the  error is less than the tolerance or
+	     * we reach the maximum number of iterations.
+		 */
+		while (eps <= my_diff && my_iterations < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
 		 * The new solution W is the average of north, south, east and west neighbors.
 		 */
 			diff = 0.0;
 			my_diff = 0.0;
-#pragma omp for schedule(static)
+#pragma omp for schedule(OMP_SCHEDULING)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
 					wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
@@ -182,6 +239,7 @@ double JacobiOmpLoopV2(double** up, double** wp, int m, int n,
 						my_diff = fabs(wp[i][j] - up[i][j]);
 				}
 			}
+// implicit barrier
 
 #ifdef __DEBUG
 			printf("tid = %d, my_diff = %g\n", omp_get_thread_num(), my_diff);
@@ -206,41 +264,48 @@ double JacobiOmpLoopV2(double** up, double** wp, int m, int n,
 			printf("tid = %d, diff = %g\n", omp_get_thread_num(), diff);
 #endif
 
+			my_iterations++;
 			my_diff = diff;
 
+#ifdef __VERBOSE
 #pragma omp single
 			{
-				(*iterations)++;
-				if (*iterations == iterations_print) {
-					printf("  %8d  %f\n", *iterations, diff);
+				if (my_iterations == iterations_print) {
+					printf("  %8d  %f\n", my_iterations, diff);
 					iterations_print = 2 * iterations_print;
 				}
 			} /* end single, implicit barrier */
+#else
+#pragma omp barrier
+#endif
 		} /* end while */
+		*iterations = my_iterations;
 	} /* end parallel */
 	return diff;
 }
 
 double JacobiOmpLoopV2err(double** up, double** wp, int m, int n,
-		double eps, int iterations_print, int* iterations) {
+		double eps, int maxit, int iterations_print, int* iterations) {
 	int i;
 	int j;
 	double **t;
 	double error;
+	int my_iterations = *iterations;
 
 	error = 10.0*eps;
 
-	/*
-     * iterate until the  error is less than the tolerance.
-	 */
-#pragma omp parallel private (j)
+#pragma omp parallel private (j) firstprivate(my_iterations)
 	{
-		while (error >= eps) {
+		/*
+	     * Iterate until the  error is less than the tolerance or
+	     * we reach the maximum number of iterations.
+		 */
+		while (error >= eps && my_iterations < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
 		 * The new solution W is the average of north, south, east and west neighbors.
 		 */
-#pragma omp for reduction(+:error)
+#pragma omp for schedule(OMP_SCHEDULING) reduction(+:error)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
 					wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
@@ -248,10 +313,13 @@ double JacobiOmpLoopV2err(double** up, double** wp, int m, int n,
 					error += (wp[i][j] - up[i][j])*(wp[i][j] - up[i][j]);
 				}
 			}
+// implicit barrier
 
 #ifdef __DEBUG
 			printf("tid = %d, my_diff = %g\n", omp_get_thread_num(), error);
 #endif
+
+			my_iterations++;
 
 #pragma omp single
 			{
@@ -264,59 +332,63 @@ double JacobiOmpLoopV2err(double** up, double** wp, int m, int n,
 				up = wp;
 				wp = t;
 
-				(*iterations)++;
-				if (*iterations == iterations_print) {
-					printf("  %8d  %f\n", *iterations, error);
+#ifdef __VERBOSE
+				if (my_iterations == iterations_print) {
+					printf("  %8d  %f\n", my_iterations, error);
 					iterations_print = 2 * iterations_print;
 				}
+#endif
 			} /* end single, implicit barrier */
 #ifdef __DEBUG
 			printf("tid = %d, diff = %g\n", omp_get_thread_num(), error);
 #endif
 		} /* end while */
+		*iterations = my_iterations;
 	} /* end parallel */
 	return error;
 }
 
 double JacobiOmpLoopV3(double** up, double** wp, int m, int n,
-		double eps, int iterations_print, int* iterations) {
+		double eps, int maxit, int iterations_print, int* iterations) {
 	int i;
 	int j;
 	double **t;
-	double *diff;
-	double max_diff;
+	double *my_diff;
 	int tid, nthreads;
+	int my_iterations = *iterations;
+
+	double diff = eps;
 
 	nthreads=omp_get_max_threads();
-	diff = malloc(sizeof(double)*nthreads);
+	my_diff = malloc(sizeof(double)*nthreads);
 
-	max_diff = eps;
-
-	/*
-     * iterate until the  error is less than the tolerance.
-	 */
-#pragma omp parallel private (j, tid)
+#pragma omp parallel private (j, tid) firstprivate(my_iterations)
 	{
 		tid = omp_get_thread_num();
 
-		while (eps <= max_diff) {
+		/*
+	     * Iterate until the  error is less than the tolerance or
+	     * we reach the maximum number of iterations.
+		 */
+		while (eps <= diff && my_iterations < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
 		 * The new solution W is the average of north, south, east and west neighbors.
 		 */
-			diff[tid] = 0.0;
-#pragma omp for
+			my_diff[tid] = 0.0;
+#pragma omp for schedule(OMP_SCHEDULING)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
 					wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
 																+ up[i][j + 1]) / 4.0;
-					if (diff[tid] < fabs(wp[i][j] - up[i][j]))
-						diff[tid] = fabs(wp[i][j] - up[i][j]);
+					if (my_diff[tid] < fabs(wp[i][j] - up[i][j]))
+						my_diff[tid] = fabs(wp[i][j] - up[i][j]);
 				}
 			}
+// implicit barrier
 
 #ifdef __DEBUG
-			printf("tid = %d, diff = %g\n", tid, diff[tid]);
+			printf("tid = %d, diff = %g\n", tid, my_diff[tid]);
 #endif
 
 #pragma omp single
@@ -329,61 +401,64 @@ double JacobiOmpLoopV3(double** up, double** wp, int m, int n,
 				up = wp;
 				wp = t;
 
-				max_diff = 0.0;
+				diff = 0.0;
 				for(j = 0; j < nthreads; j++)
-					if (diff[j] > max_diff)
-						max_diff = diff[j];
+					if (my_diff[j] > diff)
+						diff = my_diff[j];
 			} /* end single, implicit barrier */
 
 #ifdef __DEBUG
-			printf("tid = %d, diff = %g\n", tid, max_diff);
+			printf("tid = %d, diff = %g\n", tid, diff);
 #endif
 
+			my_iterations++;
+
+#ifdef __VERBOSE
 #pragma omp master
 			{
-				(*iterations)++;
-				if (*iterations == iterations_print) {
-					printf("  %8d  %f\n", *iterations, max_diff);
+				if (my_iterations == iterations_print) {
+					printf("  %8d  %f\n", my_iterations, diff);
 					iterations_print = 2 * iterations_print;
 				}
 			} /* end master */
+#endif
 		} /* end while */
+		*iterations = my_iterations;
 	} /* end parallel */
 
-	free(diff);
+	free(my_diff);
 
-	return max_diff;
+	return diff;
 }
 
 double JacobiOmpLoopV3err(double** up, double** wp, int m, int n,
-		double eps, int iterations_print, int* iterations) {
+		double eps, int maxit, int iterations_print, int* iterations) {
 	int i;
 	int j;
 	double **t;
 	double *my_error;
-	double error;
 	int tid, nthreads;
+	int my_iterations = *iterations;
+
+	double error = 10.0*eps;
 
 	nthreads=omp_get_max_threads();
 	my_error = malloc(sizeof(double)*nthreads);
 
-	error = 10.0*eps;
-
-	/*
-     * iterate until the  error is less than the tolerance.
-	 */
-#pragma omp parallel private (j, tid)
+#pragma omp parallel private (j, tid) firstprivate(my_iterations)
 	{
 		tid = omp_get_thread_num();
-
-		while (error >= eps) {
+		/*
+	     * Iterate until the  error is less than the tolerance or
+	     * we reach the maximum number of iterations.
+		 */
+		while (error >= eps && my_iterations < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
 		 * The new solution W is the average of north, south, east and west neighbors.
 		 */
-
 			my_error[tid] = 0.0;
-#pragma omp for
+#pragma omp for schedule(OMP_SCHEDULING)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
 					wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
@@ -391,6 +466,7 @@ double JacobiOmpLoopV3err(double** up, double** wp, int m, int n,
 					my_error[tid] += (wp[i][j] - up[i][j])*(wp[i][j] - up[i][j]);
 				}
 			}
+// implicit barrier
 
 #ifdef __DEBUG
 			printf("tid = %d, diff = %g\n", tid, my_error[tid]);
@@ -415,15 +491,19 @@ double JacobiOmpLoopV3err(double** up, double** wp, int m, int n,
 			printf("tid = %d, diff = %g\n", tid, error);
 #endif
 
+			my_iterations++;
+
+#ifdef __VERBOSE
 #pragma omp master
 			{
-				(*iterations)++;
-				if (*iterations == iterations_print) {
-					printf("  %8d  %f\n", *iterations, error);
+				if (my_iterations == iterations_print) {
+					printf("  %8d  %f\n", my_iterations, error);
 					iterations_print = 2 * iterations_print;
 				}
 			} /* end master */
+#endif
 		} /* end while */
+		*iterations = my_iterations;
 	} /* end parallel */
 
 	free(my_error);
@@ -433,17 +513,18 @@ double JacobiOmpLoopV3err(double** up, double** wp, int m, int n,
 
 
 double JacobiOmpLoopV4(double** up, double** wp, int m, int n,
-		double eps, int iterations_print, int* iterations) {
+		double eps, int maxit, int iterations_print, int* iterations) {
 	int i;
 	int j;
-	double diff, my_diff;
+	double my_diff;
 
-	diff = eps;
+	double diff = eps;
 
 	/*
-     * iterate until the  error is less than the tolerance.
+     * Iterate until the  error is less than the tolerance or
+     * we reach the maximum number of iterations.
 	 */
-	while (eps <= diff) {
+	while (eps <= diff && *iterations < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
 		 * The new solution W is the average of north, south, east and west neighbors.
@@ -452,14 +533,17 @@ double JacobiOmpLoopV4(double** up, double** wp, int m, int n,
 #pragma omp parallel private (j, my_diff)
 		{
 			my_diff = 0.0;
-#pragma omp for
+
+#pragma omp for schedule(OMP_SCHEDULING)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
 					wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
 																	+ up[i][j + 1]) / 4.0;
 				}
 			}
-#pragma omp for
+// implicit barrier
+
+#pragma omp for schedule(OMP_SCHEDULING)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
 					up[i][j] = (wp[i - 1][j] + wp[i + 1][j] + wp[i][j - 1]
@@ -468,44 +552,52 @@ double JacobiOmpLoopV4(double** up, double** wp, int m, int n,
 						my_diff = fabs(up[i][j] - wp[i][j]);
 				}
 			}
+//implicit barrier
+
 			if ( diff < my_diff )
 #pragma omp atomic write
 				diff = my_diff;
 		}
+
 		*iterations += 2;
+#ifdef __VERBOSE
 		if (*iterations >> 1 == iterations_print) {
 			printf("  %8d  %f\n", *iterations, diff);
 			iterations_print = 2 * iterations_print;
 		}
+#endif
 	}
 	return diff;
 }
 
 double JacobiOmpLoopV4err(double** up, double** wp, int m, int n,
-		double eps, int iterations_print, int* iterations) {
+		double eps, int maxit, int iterations_print, int* iterations) {
 	int i;
 	int j;
-	double error;
+
+	double error = 10.0*eps;
 
 	/*
-     * iterate until the  error is less than the tolerance.
+     * Iterate until the  error is less than the tolerance or
+     * we reach the maximum number of iterations.
 	 */
-	error = 10.0*eps;
-	while (error >= eps) {
+	while (error >= eps && *iterations < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
 		 * The new solution W is the average of north, south, east and west neighbors.
 		 */
 #pragma omp parallel private(j)
 		{
-#pragma omp for
+#pragma omp for schedule(OMP_SCHEDULING)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
 					wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
 																	+ up[i][j + 1]) / 4.0;
 				}
 			}
-#pragma omp for reduction(+:error)
+// implicit barrier
+
+#pragma omp for schedule(OMP_SCHEDULING) reduction(+:error) nowait
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
 					up[i][j] = (wp[i - 1][j] + wp[i + 1][j] + wp[i][j - 1]
@@ -514,17 +606,21 @@ double JacobiOmpLoopV4err(double** up, double** wp, int m, int n,
 				}
 			}
 		} /* end parallel */
+
 		*iterations +=2;
 		error = sqrt(error)/(m*n);
+#ifdef __VERBOSE
 		if (*iterations >> 1 == iterations_print) {
 			printf("  %8d  %f\n", *iterations, error);
 			iterations_print = 2 * iterations_print;
 		}
+#endif
 	}
 	return error;
 }
 
-double Jacobi(double **u, int m, int n, double eps, int omp, int sqrerr, int version,
+double Jacobi(double **u, int m, int n, double eps,
+		int maxit, int omp, int sqrerr, int version,
 		int iterations_print, int* iterations, double* wtime) {
 	double **w;
 	double err;
@@ -533,27 +629,29 @@ double Jacobi(double **u, int m, int n, double eps, int omp, int sqrerr, int ver
 
 	*iterations = 0;
 
+#ifdef __VERBOSE
 	printf ( "\n" );
 	printf ( " Iteration  Change\n" );
 	printf ( "\n" );
+#endif
 
 	*wtime = omp_get_wtime();
 	if (sqrerr == 0)
 		if (omp == 0)
-			err = JacobiSeqLoop(u, w, m, n, eps, iterations_print, iterations);
+			err = JacobiSeqLoop(u, w, m, n, eps, maxit, iterations_print, iterations);
 		else
 			switch(version) {
 			case 1:
-				err = JacobiOmpLoopV1(u, w, m, n, eps, iterations_print, iterations);
+				err = JacobiOmpLoopV1(u, w, m, n, eps, maxit, iterations_print, iterations);
 				break;
 			case 2:
-				err = JacobiOmpLoopV2(u, w, m, n, eps, iterations_print, iterations);
+				err = JacobiOmpLoopV2(u, w, m, n, eps, maxit, iterations_print, iterations);
 				break;
 			case 3:
-				err = JacobiOmpLoopV3(u, w, m, n, eps, iterations_print, iterations);
+				err = JacobiOmpLoopV3(u, w, m, n, eps, maxit, iterations_print, iterations);
 				break;
 			case 4:
-				err = JacobiOmpLoopV4(u, w, m, n, eps, iterations_print, iterations);
+				err = JacobiOmpLoopV4(u, w, m, n, eps, maxit, iterations_print, iterations);
 				break;
 			default:
 				err = -1.0;
@@ -561,20 +659,20 @@ double Jacobi(double **u, int m, int n, double eps, int omp, int sqrerr, int ver
 			}
 	else
 		if (omp == 0)
-			err = -1.0;
+			err = JacobiSeqLoopErr(u, w, m, n, eps, maxit, iterations_print, iterations);
 		else
 			switch(version) {
 			case 1:
-				err = JacobiOmpLoopV1err(u, w, m, n, eps, iterations_print, iterations);
+				err = JacobiOmpLoopV1err(u, w, m, n, eps, maxit, iterations_print, iterations);
 				break;
 			case 2:
-				err = JacobiOmpLoopV2err(u, w, m, n, eps, iterations_print, iterations);
+				err = JacobiOmpLoopV2err(u, w, m, n, eps, maxit, iterations_print, iterations);
 				break;
 			case 3:
-				err = JacobiOmpLoopV3err(u, w, m, n, eps, iterations_print, iterations);
+				err = JacobiOmpLoopV3err(u, w, m, n, eps, maxit, iterations_print, iterations);
 				break;
 			case 4:
-				err = JacobiOmpLoopV4err(u, w, m, n, eps, iterations_print, iterations);
+				err = JacobiOmpLoopV4err(u, w, m, n, eps, maxit, iterations_print, iterations);
 				break;
 			default:
 				err = -1.0;

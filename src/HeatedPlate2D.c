@@ -46,7 +46,8 @@ int main ( int argc, char *argv[] )
 
 	double **u;
 
-	int iterations;
+	int iterations = 1;
+	int maxit = 10000;
 	int nthreads = 1;
 	double err;
 	double wtime;
@@ -72,6 +73,7 @@ int main ( int argc, char *argv[] )
 			{"epsilon", required_argument, 0, 'e'},
 			{"output", required_argument, 0, 'o'},
 			{"threads", required_argument, 0, 't'},
+			{"iterations", required_argument, 0, 't'},
 			{"help", no_argument, 0, '?'},
 			{NULL, 0, NULL, 0}
     };
@@ -82,7 +84,7 @@ int main ( int argc, char *argv[] )
     errno = 0;
     while (1)
     {
-    	c = getopt_long(argc, argv, "grspo:m:n:e:t:v:?",
+    	c = getopt_long(argc, argv, "grspo:m:n:e:t:i:v:?",
     	                 long_options, &option_index);
     	if ( c == -1)
     		break;
@@ -100,7 +102,7 @@ int main ( int argc, char *argv[] )
         case 'v':
         	version = atoi(optarg);
             if (version < 1 || version > NVERSIONS) {
-            	fprintf(stderr, "ERROR: version must be between 1 and %d\n", NVERSIONS);
+            	fprintf(stderr, "ERROR: version must be between 1 and %d.\n", NVERSIONS);
             	exit(-1);
             }
         	break;
@@ -110,33 +112,33 @@ int main ( int argc, char *argv[] )
         case 'm':
             m = strtol(optarg, NULL, 10);
             if (errno == EINVAL) {
-            	fprintf(stderr, "ERROR: option m with value '%s'\n", optarg);
+            	fprintf(stderr, "ERROR: option m with value '%s'.\n", optarg);
             	exit(-1);
             }
             if (m < 2 || m > M) {
-            	fprintf(stderr, "ERROR: option m, rows must be between 2 and %d\n", M);
+            	fprintf(stderr, "ERROR: option m, rows must be between 2 and %d.\n", M);
             	exit(-1);
             }
             break;
         case 'n':
             n = strtol(optarg, NULL, 10);
             if (errno == EINVAL) {
-            	fprintf(stderr, "ERROR: option n with value '%s'\n", optarg);
+            	fprintf(stderr, "ERROR: option n with value '%s'.\n", optarg);
             	exit(-1);
             }
             if (n < 2 || n > N) {
-            	fprintf(stderr, "ERROR: option n, columns must be between 2 and %d\n", N);
+            	fprintf(stderr, "ERROR: option n, columns must be between 2 and %d.\n", N);
             	exit(-1);
             }
             break;
         case 'e':
             epsilon = strtod(optarg, NULL);
             if (errno == EINVAL) {
-            	fprintf(stderr, "ERROR: option n with value '%s'\n", optarg);
+            	fprintf(stderr, "ERROR: option n with value '%s'.\n", optarg);
             	exit(-1);
             }
             if (epsilon <= 0.0) {
-            	fprintf(stderr, "ERROR: option e, columns must be greater than 0\n");
+            	fprintf(stderr, "ERROR: option e, columns must be greater than 0.\n");
             	exit(-1);
             }
             break;
@@ -145,21 +147,34 @@ int main ( int argc, char *argv[] )
         	break;
         case 't':
         	nthreads = atoi(optarg);
+        	if (nthreads < 1) {
+            	fprintf(stderr, "ERROR: nthreads must be greater than 0.\n");
+            	exit(-1);
+        	}
+        	break;
+        case 'i':
+        	maxit = atoi(optarg);
+        	if (maxit < 1) {
+            	fprintf(stderr, "ERROR: max iterations must be greater than 0.\n");
+            	exit(-1);
+        	}
         	break;
         case '?':
         	printf("Usage: HeatedPlate [OPTION]\n");
         	printf("Solves the steady state heat equation with various solvers.\n");
         	printf("\n");
         	printf("Mandatory arguments to long options are mandatory for short options too.\n");
+        	printf("  -e, --epsilon=E\tStops when the error is less than E*M*N.\n");
         	printf("  -g, --gs\t\tUse Gauss-Seidel iterations (default Jacobi iterations).\n");
-        	printf("  -r, --rb\t\tUse Red-Black ordering (only for Gauss-Seidel).\n");
-        	printf("  -v, --version\t\tUse the V version of the algorithm.\n");
-        	printf("  -s, --sqrerr\t\tCompute the squared mean error to test for convergence.\n");
-        	printf("  -p, --openmp\t\tUse the OpenMP variants (RB G-S and Jacobi only).\n");
-        	printf("  -t, --threads\t\tUse T threads.\n");
+        	printf("  -i, --iterations\t\tMaximum number of iterations.\n");
         	printf("  -m, --mrows=M\t\tUse a grid with M rows.\n");
         	printf("  -n, --ncols=N\t\tUse a grid with N columns.\n");
-        	printf("  -e, --epsilon=E\tStops when the error is less than E*M*N.\n");
+        	printf("  -o, --outfile\t\tSave the final matrix in <outfile>.\n");
+        	printf("  -p, --openmp\t\tUse the OpenMP variants (RB G-S and Jacobi only).\n");
+        	printf("  -r, --rb\t\tUse Red-Black ordering (only for Gauss-Seidel).\n");
+        	printf("  -s, --sqrerr\t\tCompute the squared mean error to test for convergence.\n");
+        	printf("  -t, --threads\t\tUse T threads.\n");
+        	printf("  -v, --version\t\tUse the V version of the algorithm.\n");
         	exit(-1);
             break;
         default:
@@ -191,12 +206,13 @@ int main ( int argc, char *argv[] )
     	}
     }
 
+	omp_set_num_threads(nthreads);
+
 	printf ( "\n" );
 	printf ( "HEATED_PLATE\n");
-	if (openmp==1) {
+	if (openmp==1)
 		printf( " OpenMP version.\n");
-		omp_set_num_threads(nthreads);
-	}
+
 	printf ( "  A program to solve for the steady state temperature distribution\n" );
 	printf ( "  over a rectangular plate.\n" );
 
@@ -231,15 +247,15 @@ int main ( int argc, char *argv[] )
 	}
 
 	if (red_black == 1)
-		err = RedBlack_GaussSeidel(u, m, n, epsilon, openmp, sqrerr, version,
+		err = RedBlack_GaussSeidel(u, m, n, epsilon, maxit, openmp, sqrerr, version,
 					1, &iterations, &wtime);
 	else if (gauss_seidel == 1)
 		if (openmp == 0 && version == 1)
-			err = GaussSeidel(u, m, n, sqrerr, epsilon, 1, &iterations, &wtime);
+			err = GaussSeidel(u, m, n, sqrerr, epsilon, maxit, 1, &iterations, &wtime);
 		else
 			err = -1.0;
 	else
-		err = Jacobi(u, m, n, epsilon, openmp, sqrerr, version,
+		err = Jacobi(u, m, n, epsilon, maxit, openmp, sqrerr, version,
 				1, &iterations, &wtime);
 
 	if (err < 0.0) {
@@ -247,8 +263,14 @@ int main ( int argc, char *argv[] )
 		exit(-1);
 	}
 
+
 	printf ( "\n" );
-	printf ( "  Error tolerance achieved.\n" );
+
+	if (iterations >= maxit)
+		printf ( "  Maximum number of iterations.\n" );
+	if (err <= epsilon)
+		printf ( "  Error tolerance achieved.\n" );
+
 	printf ( "  Threads = %d, Wallclock time = %f, Iterations = %d, Error = %f\n", nthreads, wtime, iterations, err);
 
 	if (fd != NULL) {

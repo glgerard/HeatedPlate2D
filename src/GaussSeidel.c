@@ -17,15 +17,15 @@
 
 #include "HeatedPlate2D.h"
 
-double GaussSeidelV1(double **u, int m, int n, double eps,
+double GaussSeidelV1(double **u, int m, int n,
+		double eps, int maxit,
 		int iterations_print, int* iterations) {
 	int i, j;
-	double diff;
 	double v;
 
-	diff = eps;
+	double diff = eps;
 
-	while (eps <= diff) {
+	while (eps <= diff && (*iterations) < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
 		 */
@@ -42,15 +42,54 @@ double GaussSeidelV1(double **u, int m, int n, double eps,
 		}
 
 		(*iterations)++;
+#ifdef __VERBOSE
 		if (*iterations == iterations_print) {
 			printf("  %8d  %f\n", *iterations, diff);
 			iterations_print = 2 * iterations_print;
 		}
+#endif
 	}
 	return diff;
 }
 
-double GaussSeidel(double **u, int m, int n, int sqrerr, double eps,
+double GaussSeidelV1Err(double **u, int m, int n,
+		double eps, int maxit,
+		int iterations_print, int* iterations) {
+	int i, j;
+	double v;
+
+	double error = 10.0*eps;
+
+	while (error >= eps  && (*iterations) < maxit) {
+		/*
+		 * Determine the new estimate of the solution at the interior points.
+		 */
+		error = 0.0;
+
+		for (i = 1; i < m - 1; i++) {
+			for (j = 1; j < n - 1; j ++) {
+				v = (u[i - 1][j] + u[i + 1][j] + u[i][j - 1]
+													  + u[i][j + 1]) / 4.0;
+				error += (v - u[i][j])*(v - u[i][j]);
+				u[i][j] = v;
+			}
+		}
+
+		(*iterations)++;
+		error = sqrt(error)/(m*n);
+
+#ifdef __VERBOSE
+		if (*iterations == iterations_print) {
+			printf("  %8d  %f\n", *iterations, diff);
+			iterations_print = 2 * iterations_print;
+		}
+#endif
+	}
+	return error;
+}
+
+double GaussSeidel(double **u, int m, int n, int sqrerr,
+		double eps, int maxit,
 		int iterations_print, int* iterations, double* wtime) {
 	double err;
 
@@ -59,15 +98,17 @@ double GaussSeidel(double **u, int m, int n, int sqrerr, double eps,
 	 */
 	*iterations = 0;
 
+#ifdef __VERBOSE
 	printf ( "\n" );
 	printf ( " Iteration  Change\n" );
 	printf ( "\n" );
+#endif
 
 	*wtime = omp_get_wtime();
 	if (sqrerr == 0)
-		err = GaussSeidelV1(u,m,n,eps,iterations_print, iterations);
+		err = GaussSeidelV1(u, m, n, eps, maxit, iterations_print, iterations);
 	else
-		err = -1.0;
+		err = GaussSeidelV1Err(u, m, n, eps, maxit, iterations_print, iterations);
 	*wtime = omp_get_wtime() - *wtime;
 	return err;
 }
