@@ -17,7 +17,7 @@
 
 #include "HeatedPlate2D.h"
 
-double GaussSeidelV1(double **u, int m, int n,
+double GaussSeidelSeqLoop(double **u, int m, int n,
 		double eps, int maxit,
 		int iterations_print, int* iterations) {
 	int i, j;
@@ -52,7 +52,7 @@ double GaussSeidelV1(double **u, int m, int n,
 	return diff;
 }
 
-double GaussSeidelV1Err(double **u, int m, int n,
+double GaussSeidelSeqLoopErr(double **u, int m, int n,
 		double eps, int maxit,
 		int iterations_print, int* iterations) {
 	int i, j;
@@ -64,8 +64,6 @@ double GaussSeidelV1Err(double **u, int m, int n,
 		/*
 		 * Determine the new estimate of the solution at the interior points.
 		 */
-		error = 0.0;
-
 		for (i = 1; i < m - 1; i++) {
 			for (j = 1; j < n - 1; j ++) {
 				v = (u[i - 1][j] + u[i + 1][j] + u[i][j - 1]
@@ -106,9 +104,9 @@ double GaussSeidel(double **u, int m, int n, int sqrerr,
 
 	*wtime = omp_get_wtime();
 	if (sqrerr == 0)
-		err = GaussSeidelV1(u, m, n, eps, maxit, iterations_print, iterations);
+		err = GaussSeidelSeqLoop(u, m, n, eps, maxit, iterations_print, iterations);
 	else
-		err = GaussSeidelV1Err(u, m, n, eps, maxit, iterations_print, iterations);
+		err = GaussSeidelSeqLoopErr(u, m, n, eps, maxit, iterations_print, iterations);
 	*wtime = omp_get_wtime() - *wtime;
 	return err;
 }

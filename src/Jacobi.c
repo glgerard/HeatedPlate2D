@@ -33,7 +33,8 @@ double JacobiSeqLoop(double** up, double** wp, int m, int n,
 	while (eps <= diff && (*iterations) < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
-		 * The new solution W is the average of north, south, east and west neighbors.
+		 * The new solution W is the average of north, south, east and west
+		 * neighbors.
 		 */
 		diff = 0.0;
 		for (i = 1; i < m - 1; i++) {
@@ -77,7 +78,8 @@ double JacobiSeqLoopErr(double** up, double** wp, int m, int n,
 	while (error >= eps && (*iterations) < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
-		 * The new solution W is the average of north, south, east and west neighbors.
+		 * The new solution W is the average of north, south, east and west
+		 * neighbors.
 		 */
 		for (i = 1; i < m - 1; i++) {
 			for (j = 1; j < n - 1; j++) {
