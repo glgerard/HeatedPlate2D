@@ -78,7 +78,7 @@ double GaussSeidelSeqLoopErr(double **u, int m, int n,
 
 #ifdef __VERBOSE
 		if (*iterations == iterations_print) {
-			printf("  %8d  %f\n", *iterations, diff);
+			printf("  %8d  %f\n", *iterations, error);
 			iterations_print = 2 * iterations_print;
 		}
 #endif

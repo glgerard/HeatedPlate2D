@@ -197,7 +197,7 @@ double RB_GS_OmpLoopV1err(double** black, double** red, int m, int n,
      * Iterate until the  error is less than the tolerance or
      * we reach the maximum number of iterations.
 	 */
-	while (error > eps && *iterations < maxit) {
+	while (error >= eps && *iterations < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
 		 */
@@ -310,6 +310,7 @@ double RB_GS_OmpLoopV2(double** black, double** red, int m, int n,
 #pragma omp barrier
 #endif
 		} /* end while */
+#pragma omp master
 		*iterations = my_iterations;
 	} /* end parallel */
 	return diff;
@@ -324,14 +325,13 @@ double RB_GS_OmpLoopV2err(double** black, double** red, int m, int n,
 	int my_iterations = *iterations;
 	double error= 10.0*eps;
 
-
-#pragma omp parallel private(j, v)
+#pragma omp parallel private(j, v) firstprivate(my_iterations)
 	{
 		/*
 	     * Iterate until the  error is less than the tolerance or
 	     * we reach the maximum number of iterations.
 		 */
-		while (error > eps && my_iterations < maxit) {
+		while (error >= eps && my_iterations < maxit) {
 			/*
 			 * Determine the new estimate of the solution at the interior points.
 			 */
@@ -364,7 +364,6 @@ double RB_GS_OmpLoopV2err(double** black, double** red, int m, int n,
 #pragma omp single
 			{
 				error = sqrt(error)/(m*n);
-
 #ifdef __VERBOSE
 				if (my_iterations == iterations_print) {
 					printf("  %8d  %f\n", my_iterations, error);
@@ -373,8 +372,10 @@ double RB_GS_OmpLoopV2err(double** black, double** red, int m, int n,
 #endif
 			} /* end single, implicit barrier */
 		} /* end while */
+#pragma omp master
 		*iterations = my_iterations;
 	} /* end parallel */
+
 	return error;
 }
 
@@ -394,7 +395,7 @@ double RB_GS_OmpLoopV3(double** black, double** red, int m, int n,
 	my_diffR = malloc(sizeof(double)*nthreads);
 	my_diffB = malloc(sizeof(double)*nthreads);
 
-#pragma omp parallel private(j, v, tid)
+#pragma omp parallel private(j, v, tid) firstprivate(my_iterations)
 	{
 		tid = omp_get_thread_num();
 
@@ -455,6 +456,7 @@ double RB_GS_OmpLoopV3(double** black, double** red, int m, int n,
 			}
 #endif
 		} /* end while */
+#pragma omp master
 		*iterations = my_iterations;
 	} /* end parallel */
 
@@ -478,7 +480,7 @@ double RB_GS_OmpLoopV3err(double** black, double** red, int m, int n,
 	nthreads=omp_get_max_threads();
 	my_error = malloc(sizeof(double)*nthreads);
 
-#pragma omp parallel private(j, v, tid)
+#pragma omp parallel private(j, v, tid) firstprivate(my_iterations)
 	{
 		tid = omp_get_thread_num();
 
@@ -486,7 +488,7 @@ double RB_GS_OmpLoopV3err(double** black, double** red, int m, int n,
 	     * Iterate until the  error is less than the tolerance or
 	     * we reach the maximum number of iterations.
 		 */
-		while (error > eps && my_iterations < maxit) {
+		while (error >= eps && my_iterations < maxit) {
 			/*
 			 * Determine the new estimate of the solution at the interior points.
 			 */
@@ -530,6 +532,7 @@ double RB_GS_OmpLoopV3err(double** black, double** red, int m, int n,
 			}
 #endif
 		} /* end while */
+#pragma omp master
 		*iterations = my_iterations;
 	} /* end parallel */
 
@@ -641,7 +644,7 @@ double RB_GS_OmpLoopV4err(double** black, double** red, int m, int n,
      * Iterate until the  error is less than the tolerance or
      * we reach the maximum number of iterations.
 	 */
-	while (error > eps && *iterations < maxit) {
+	while (error >= eps && *iterations < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
 		 */
