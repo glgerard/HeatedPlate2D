@@ -8,7 +8,7 @@
 #ifndef HEATEDPLATELOCAL_SRC_HEATEDPLATE_H_
 #define HEATEDPLATELOCAL_SRC_HEATEDPLATE_H_
 
-#define OMP_SCHEDULING static
+#define OMP_SCHED static
 
 # define M 8192
 # define N 8192
