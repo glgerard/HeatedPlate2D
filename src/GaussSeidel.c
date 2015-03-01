@@ -66,8 +66,8 @@ double GaussSeidelSeqLoopErr(double **u, int m, int n,
 		 */
 		for (i = 1; i < m - 1; i++) {
 			for (j = 1; j < n - 1; j ++) {
-				v = (u[i - 1][j] + u[i + 1][j] + u[i][j - 1]
-													  + u[i][j + 1]) / 4.0;
+				v = 0.25*(u[i - 1][j] + u[i + 1][j] +
+					u[i][j - 1] + u[i][j + 1]);
 				error += (v - u[i][j])*(v - u[i][j]);
 				u[i][j] = v;
 			}

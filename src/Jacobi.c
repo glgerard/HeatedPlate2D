@@ -39,8 +39,8 @@ double JacobiSeqLoop(double** up, double** wp, int m, int n,
 		diff = 0.0;
 		for (i = 1; i < m - 1; i++) {
 			for (j = 1; j < n - 1; j++) {
-				wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
-						+ up[i][j + 1]) / 4.0;
+				wp[i][j] = 0.25*(up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
+						+ up[i][j + 1]);
 				if ( diff < fabs(wp[i][j] - up[i][j]) )
 					diff = fabs(wp[i][j] - up[i][j]);
 			}
@@ -83,8 +83,8 @@ double JacobiSeqLoopErr(double** up, double** wp, int m, int n,
 		 */
 		for (i = 1; i < m - 1; i++) {
 			for (j = 1; j < n - 1; j++) {
-				wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
-						+ up[i][j + 1]) / 4.0;
+				wp[i][j] = 0.25*(up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
+						+ up[i][j + 1]);
 				error += (wp[i][j] - up[i][j])*(wp[i][j] - up[i][j]);
 			}
 		}
@@ -123,18 +123,19 @@ double JacobiOmpLoopV1(double** up, double** wp, int m, int n,
 	while (eps <= diff && (*iterations) < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
-		 * The new solution W is the average of north, south, east and west neighbors.
+		 * The new solution W is the average of north, south, east and west
+		 * neighbors.
 		 */
 		diff=0.0;
 #pragma omp parallel private (j, my_diff)
 		{
 			my_diff = 0.0;
 
-#pragma omp for schedule(OMP_SCHEDULING)
+#pragma omp for schedule(OMP_SCHED)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
-					wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
-																	+ up[i][j + 1]) / 4.0;
+					wp[i][j] = 0.25*(up[i - 1][j] + up[i + 1][j] +
+								up[i][j - 1] + up[i][j + 1]);
 					if ( my_diff < fabs(wp[i][j] - up[i][j]) )
 						my_diff = fabs(wp[i][j] - up[i][j]);
 				}
@@ -177,13 +178,14 @@ double JacobiOmpLoopV1err(double** up, double** wp, int m, int n,
 	while (error >= eps && (*iterations) < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
-		 * The new solution W is the average of north, south, east and west neighbors.
+		 * The new solution W is the average of north, south, east and west
+		 * neighbors.
 		 */
-#pragma omp parallel for schedule(OMP_SCHEDULING) private(j) reduction(+:error)
+#pragma omp parallel for schedule(OMP_SCHED) private(j) reduction(+:error)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
-					wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
-																	+ up[i][j + 1]) / 4.0;
+					wp[i][j] = 0.25*(up[i - 1][j] + up[i + 1][j] +
+								up[i][j - 1] + up[i][j + 1]);
 					error += (wp[i][j] - up[i][j])*(wp[i][j] - up[i][j]);
 				}
 			}
@@ -228,15 +230,16 @@ double JacobiOmpLoopV2(double** up, double** wp, int m, int n,
 		while (eps <= my_diff && my_iterations < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
-		 * The new solution W is the average of north, south, east and west neighbors.
+		 * The new solution W is the average of north, south, east and west
+		 * neighbors.
 		 */
 			diff = 0.0;
 			my_diff = 0.0;
-#pragma omp for schedule(OMP_SCHEDULING)
+#pragma omp for schedule(OMP_SCHED)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
-					wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
-																+ up[i][j + 1]) / 4.0;
+					wp[i][j] = 0.25*(up[i - 1][j] + up[i + 1][j] +
+								up[i][j - 1] + up[i][j + 1]);
 					if (my_diff < fabs(wp[i][j] - up[i][j]))
 						my_diff = fabs(wp[i][j] - up[i][j]);
 				}
@@ -305,13 +308,14 @@ double JacobiOmpLoopV2err(double** up, double** wp, int m, int n,
 		while (error >= eps && my_iterations < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
-		 * The new solution W is the average of north, south, east and west neighbors.
+		 * The new solution W is the average of north, south, east and west
+		 * neighbors.
 		 */
-#pragma omp for schedule(OMP_SCHEDULING) reduction(+:error)
+#pragma omp for schedule(OMP_SCHED) reduction(+:error)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
-					wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
-																+ up[i][j + 1]) / 4.0;
+					wp[i][j] = 0.25*(up[i - 1][j] + up[i + 1][j] +
+								up[i][j - 1] + up[i][j + 1]);
 					error += (wp[i][j] - up[i][j])*(wp[i][j] - up[i][j]);
 				}
 			}
@@ -327,8 +331,8 @@ double JacobiOmpLoopV2err(double** up, double** wp, int m, int n,
 			{
 				error = sqrt(error)/(m*n);
 				/*
-				 * Swap wp and up so that at the next iteration up points to the new
-				 * solution.
+				 * Swap wp and up so that at the next iteration up points
+				 * to the new solution.
 				 */
 				t = up;
 				up = wp;
@@ -375,14 +379,15 @@ double JacobiOmpLoopV3(double** up, double** wp, int m, int n,
 		while (eps <= diff && my_iterations < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
-		 * The new solution W is the average of north, south, east and west neighbors.
+		 * The new solution W is the average of north, south, east and west
+		 * neighbors.
 		 */
 			my_diff[tid] = 0.0;
-#pragma omp for schedule(OMP_SCHEDULING)
+#pragma omp for schedule(OMP_SCHED)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
-					wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
-																+ up[i][j + 1]) / 4.0;
+					wp[i][j] = 0.25*(up[i - 1][j] + up[i + 1][j] +
+								up[i][j - 1] + up[i][j + 1]);
 					if (my_diff[tid] < fabs(wp[i][j] - up[i][j]))
 						my_diff[tid] = fabs(wp[i][j] - up[i][j]);
 				}
@@ -457,14 +462,15 @@ double JacobiOmpLoopV3err(double** up, double** wp, int m, int n,
 		while (error >= eps && my_iterations < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
-		 * The new solution W is the average of north, south, east and west neighbors.
+		 * The new solution W is the average of north, south, east and west
+		 * neighbors.
 		 */
 			my_error[tid] = 0.0;
-#pragma omp for schedule(OMP_SCHEDULING)
+#pragma omp for schedule(OMP_SCHED)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
-					wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
-																+ up[i][j + 1]) / 4.0;
+					wp[i][j] = (up[i - 1][j] + up[i + 1][j] +
+								up[i][j - 1] + up[i][j + 1]) / 4.0;
 					my_error[tid] += (wp[i][j] - up[i][j])*(wp[i][j] - up[i][j]);
 				}
 			}
@@ -529,23 +535,24 @@ double JacobiOmpLoopV4(double** up, double** wp, int m, int n,
 	while (eps <= diff && *iterations < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
-		 * The new solution W is the average of north, south, east and west neighbors.
+		 * The new solution W is the average of north, south, east and west
+		 * neighbors.
 		 */
 		diff=0.0;
 #pragma omp parallel private (j, my_diff)
 		{
 			my_diff = 0.0;
 
-#pragma omp for schedule(OMP_SCHEDULING)
+#pragma omp for schedule(OMP_SCHED)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
-					wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
-																	+ up[i][j + 1]) / 4.0;
+					wp[i][j] = (up[i - 1][j] + up[i + 1][j] +
+								up[i][j - 1] + up[i][j + 1]) / 4.0;
 				}
 			}
 // implicit barrier
 
-#pragma omp for schedule(OMP_SCHEDULING)
+#pragma omp for schedule(OMP_SCHED)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
 					up[i][j] = (wp[i - 1][j] + wp[i + 1][j] + wp[i][j - 1]
@@ -586,24 +593,25 @@ double JacobiOmpLoopV4err(double** up, double** wp, int m, int n,
 	while (error >= eps && *iterations < maxit) {
 		/*
 		 * Determine the new estimate of the solution at the interior points.
-		 * The new solution W is the average of north, south, east and west neighbors.
+		 * The new solution W is the average of north, south, east and west
+		 * neighbors.
 		 */
 #pragma omp parallel private(j)
 		{
-#pragma omp for schedule(OMP_SCHEDULING)
+#pragma omp for schedule(OMP_SCHED)
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
-					wp[i][j] = (up[i - 1][j] + up[i + 1][j] + up[i][j - 1]
-																	+ up[i][j + 1]) / 4.0;
+					wp[i][j] = (up[i - 1][j] + up[i + 1][j] +
+								up[i][j - 1] + up[i][j + 1]) / 4.0;
 				}
 			}
 // implicit barrier
 
-#pragma omp for schedule(OMP_SCHEDULING) reduction(+:error) nowait
+#pragma omp for schedule(OMP_SCHED) reduction(+:error) nowait
 			for (i = 1; i < m - 1; i++) {
 				for (j = 1; j < n - 1; j++) {
-					up[i][j] = (wp[i - 1][j] + wp[i + 1][j] + wp[i][j - 1]
-																	+ wp[i][j + 1]) / 4.0;
+					up[i][j] = (wp[i - 1][j] + wp[i + 1][j] +
+								wp[i][j - 1] + wp[i][j + 1]) / 4.0;
 					error += (up[i][j] - wp[i][j])*(up[i][j] - wp[i][j]);
 				}
 			}

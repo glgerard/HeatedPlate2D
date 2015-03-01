@@ -40,7 +40,8 @@ double RB_GS_SeqLoop(double** black, double **red, int m, int n,
 		 */
 		for (i = 1; i < m - 1; i++)
 			for (j = i%2; j < n/2 - (i+1)%2; j++) {
-				v = (red[i - 1][j] + red[i + 1][j] + red[i][j - i%2] + red[i][j + (i+1)%2]) / 4.0;
+				v = 0.25*(red[i - 1][j] + red[i + 1][j] +
+						red[i][j - i%2] + red[i][j + (i+1)%2]);
 				if (diff < fabs(v - black[i][j]))
 					diff = fabs(v - black[i][j]);
 				black[i][j] = v;
@@ -51,7 +52,8 @@ double RB_GS_SeqLoop(double** black, double **red, int m, int n,
 		 */
 		for (i = 1; i < m - 1; i++)
 			for (j = (i+1)%2; j < n/2 - i%2; j++) {
-				v = (black[i - 1][j] + black[i + 1][j] + black[i][j - (i+1)%2] + black[i][j + i%2]) / 4.0;
+				v = 0.25*(black[i - 1][j] + black[i + 1][j] +
+						black[i][j - (i+1)%2] + black[i][j + i%2]);
 				if (diff < fabs(v - red[i][j]))
 					diff = fabs(v - red[i][j]);
 				red[i][j] = v;
@@ -90,7 +92,8 @@ double RB_GS_SeqLoopErr(double** black, double **red, int m, int n,
 		 */
 		for (i = 1; i < m - 1; i++)
 			for (j = i%2; j < n/2 - (i+1)%2; j++) {
-				v = (red[i - 1][j] + red[i + 1][j] + red[i][j - i%2] + red[i][j + (i+1)%2]) / 4.0;
+				v = 0.25*(red[i - 1][j] + red[i + 1][j] +
+						red[i][j - i%2] + red[i][j + (i+1)%2]);
 				error += (v - black[i][j])*(v - black[i][j]);
 				black[i][j] = v;
 			}
@@ -100,7 +103,8 @@ double RB_GS_SeqLoopErr(double** black, double **red, int m, int n,
 		 */
 		for (i = 1; i < m - 1; i++)
 			for (j = (i+1)%2; j < n/2 - i%2; j++) {
-				v = (black[i - 1][j] + black[i + 1][j] + black[i][j - (i+1)%2] + black[i][j + i%2]) / 4.0;
+				v = 0.25*(black[i - 1][j] + black[i + 1][j] +
+						black[i][j - (i+1)%2] + black[i][j + i%2]);
 				error += (v - red[i][j])*(v - red[i][j]);
 				red[i][j] = v;
 			}
@@ -143,10 +147,11 @@ double RB_GS_OmpLoopV1(double** black, double** red, int m, int n,
 			/*
 			 * Black sweep
 			 */
-#pragma omp for schedule(OMP_SCHEDULING)
+#pragma omp for schedule(OMP_SCHED)
 			for (i = 1; i < m - 1; i++)
 				for (j = i%2; j < n/2 - (i+1)%2; j++) {
-					v = (red[i - 1][j] + red[i + 1][j] + red[i][j - i%2] + red[i][j + (i+1)%2]) / 4.0;
+					v = 0.25*(red[i - 1][j] + red[i + 1][j] +
+							red[i][j - i%2] + red[i][j + (i+1)%2]);
 					if (my_diffB < fabs(v - black[i][j]))
 						my_diffB = fabs(v - black[i][j]);
 					black[i][j] = v;
@@ -157,10 +162,11 @@ double RB_GS_OmpLoopV1(double** black, double** red, int m, int n,
 			/*
 			 * Red sweep
 			 */
-#pragma omp for schedule(OMP_SCHEDULING) nowait
+#pragma omp for schedule(OMP_SCHED) nowait
  			for (i = 1; i < m - 1; i++)
 				for (j = (i+1)%2; j < n/2 - i%2; j++) {
-					v = (black[i - 1][j] + black[i + 1][j] + black[i][j - (i+1)%2] + black[i][j + i%2]) / 4.0;
+					v = 0.25*(black[i - 1][j] + black[i + 1][j] +
+							black[i][j - (i+1)%2] + black[i][j + i%2]);
 					if (my_diffR < fabs(v - red[i][j]))
 						my_diffR = fabs(v - red[i][j]);
 					red[i][j] = v;
@@ -206,10 +212,11 @@ double RB_GS_OmpLoopV1err(double** black, double** red, int m, int n,
 			/*
 			 * Black sweep
 			 */
-#pragma omp for schedule(OMP_SCHEDULING) reduction(+:error)
+#pragma omp for schedule(OMP_SCHED) reduction(+:error)
 			for (i = 1; i < m - 1; i++)
 				for (j = i%2; j < n/2 - (i+1)%2; j++) {
-					v = (red[i - 1][j] + red[i + 1][j] + red[i][j - i%2] + red[i][j + (i+1)%2]) / 4.0;
+					v = 0.25*(red[i - 1][j] + red[i + 1][j] +
+							red[i][j - i%2] + red[i][j + (i+1)%2]);
 					error += (v - black[i][j])*(v - black[i][j]);
 					black[i][j] = v;
 				}
@@ -218,10 +225,11 @@ double RB_GS_OmpLoopV1err(double** black, double** red, int m, int n,
 			/*
 			 * Red sweep
 			 */
-#pragma omp for schedule(OMP_SCHEDULING) reduction(+:error) nowait
+#pragma omp for schedule(OMP_SCHED) reduction(+:error) nowait
 			for (i = 1; i < m - 1; i++)
 				for (j = (i+1)%2; j < n/2 - i%2; j++) {
-					v = (black[i - 1][j] + black[i + 1][j] + black[i][j - (i+1)%2] + black[i][j + i%2]) / 4.0;
+					v = 0.25*(black[i - 1][j] + black[i + 1][j] +
+							black[i][j - (i+1)%2] + black[i][j + i%2]);
 					error += (v - red[i][j])*(v - red[i][j]);
 					red[i][j] = v;
 				}
@@ -265,10 +273,11 @@ double RB_GS_OmpLoopV2(double** black, double** red, int m, int n,
 			/*
 			 * Black sweep
 			 */
-#pragma omp for schedule(OMP_SCHEDULING)
+#pragma omp for schedule(OMP_SCHED)
 			for (i = 1; i < m - 1; i++)
 				for (j = i%2; j < n/2 - (i+1)%2; j++) {
-					v = (red[i - 1][j] + red[i + 1][j] + red[i][j - i%2] + red[i][j + (i+1)%2]) / 4.0;
+					v = 0.25*(red[i - 1][j] + red[i + 1][j] +
+							red[i][j - i%2] + red[i][j + (i+1)%2]);
 					if (my_diffB < fabs(v - black[i][j]))
 						my_diffB = fabs(v - black[i][j]);
 					black[i][j] = v;
@@ -279,10 +288,11 @@ double RB_GS_OmpLoopV2(double** black, double** red, int m, int n,
 			/*
 			 * Red sweep
 			 */
-#pragma omp for schedule(OMP_SCHEDULING) nowait
+#pragma omp for schedule(OMP_SCHED) nowait
 			for (i = 1; i < m - 1; i++)
 				for (j = (i+1)%2; j < n/2 - i%2; j++) {
-					v = (black[i - 1][j] + black[i + 1][j] + black[i][j - (i+1)%2] + black[i][j + i%2]) / 4.0;
+					v = 0.25*(black[i - 1][j] + black[i + 1][j] +
+							black[i][j - (i+1)%2] + black[i][j + i%2]);
 					if (my_diffR < fabs(v - red[i][j]))
 						my_diffR = fabs(v - red[i][j]);
 					red[i][j] = v;
@@ -333,15 +343,16 @@ double RB_GS_OmpLoopV2err(double** black, double** red, int m, int n,
 		 */
 		while (error >= eps && my_iterations < maxit) {
 			/*
-			 * Determine the new estimate of the solution at the interior points.
+			 * Determine the new estimate of the solution.
 			 */
 			/*
 			 * Black sweep
 			 */
-#pragma omp for schedule(OMP_SCHEDULING) reduction(+:error)
+#pragma omp for schedule(OMP_SCHED) reduction(+:error)
 			for (i = 1; i < m - 1; i++)
 				for (j = i%2; j < n/2 - (i+1)%2; j++) {
-					v = (red[i - 1][j] + red[i + 1][j] + red[i][j - i%2] + red[i][j + (i+1)%2]) / 4.0;
+					v = 0.25*(red[i - 1][j] + red[i + 1][j] +
+							red[i][j - i%2] + red[i][j + (i+1)%2]);
 					error += (v - black[i][j])*(v - black[i][j]);
 					black[i][j] = v;
 				}
@@ -350,10 +361,11 @@ double RB_GS_OmpLoopV2err(double** black, double** red, int m, int n,
 			/*
 			 * Red sweep
 			 */
-#pragma omp for schedule(OMP_SCHEDULING) reduction(+:error)
+#pragma omp for schedule(OMP_SCHED) reduction(+:error)
 			for (i = 1; i < m - 1; i++)
 				for (j = (i+1)%2; j < n/2 - i%2; j++) {
-					v = (black[i - 1][j] + black[i + 1][j] + black[i][j - (i+1)%2] + black[i][j + i%2]) / 4.0;
+					v = 0.25*(black[i - 1][j] + black[i + 1][j] +
+							black[i][j - (i+1)%2] + black[i][j + i%2]);
 					error += (v - red[i][j])*(v - red[i][j]);
 					red[i][j] = v;
 				}
@@ -411,10 +423,11 @@ double RB_GS_OmpLoopV3(double** black, double** red, int m, int n,
 			 * Black sweep
 			 */
 			my_diffB[tid] = 0.0;
-#pragma omp for schedule(OMP_SCHEDULING)
+#pragma omp for schedule(OMP_SCHED)
 			for (i = 1; i < m - 1; i++)
 				for (j = i%2; j < n/2 - (i+1)%2; j++) {
-					v = (red[i - 1][j] + red[i + 1][j] + red[i][j - i%2] + red[i][j + (i+1)%2]) / 4.0;
+					v = 0.25*(red[i - 1][j] + red[i + 1][j] +
+							red[i][j - i%2] + red[i][j + (i+1)%2]);
 					if (my_diffB[tid] < fabs(v - black[i][j]))
 						my_diffB[tid] = fabs(v - black[i][j]);
 					black[i][j] = v;
@@ -425,16 +438,18 @@ double RB_GS_OmpLoopV3(double** black, double** red, int m, int n,
 			 * Red sweep
 			 */
 			my_diffR[tid] = 0.0;
-#pragma omp for schedule(OMP_SCHEDULING) nowait
+#pragma omp for schedule(OMP_SCHED) nowait
 			for (i = 1; i < m - 1; i++)
 				for (j = (i+1)%2; j < n/2 - i%2; j++) {
-					v = (black[i - 1][j] + black[i + 1][j] + black[i][j - (i+1)%2] + black[i][j + i%2]) / 4.0;
+					v = 0.25*(black[i - 1][j] + black[i + 1][j] +
+							black[i][j - (i+1)%2] + black[i][j + i%2]);
 					if (my_diffR[tid] < fabs(v - red[i][j]))
 						my_diffR[tid] = fabs(v - red[i][j]);
 					red[i][j] = v;
 				}
 
-			my_diff[tid] = my_diffR[tid] < my_diffB[tid] ? my_diffB[tid] : my_diffR[tid];
+			my_diff[tid] = my_diffR[tid] < my_diffB[tid] ?
+					my_diffB[tid] : my_diffR[tid];
 #pragma omp barrier
 			my_iterations++;
 
@@ -496,20 +511,22 @@ double RB_GS_OmpLoopV3err(double** black, double** red, int m, int n,
 			/*
 			 * Black sweep
 			 */
-#pragma omp for schedule(OMP_SCHEDULING)
+#pragma omp for schedule(OMP_SCHED)
 			for (i = 1; i < m - 1; i++)
 				for (j = i%2; j < n/2 - (i+1)%2; j++) {
-					v = (red[i - 1][j] + red[i + 1][j] + red[i][j - i%2] + red[i][j + (i+1)%2]) / 4.0;
+					v = 0.25*(red[i - 1][j] + red[i + 1][j] +
+							red[i][j - i%2] + red[i][j + (i+1)%2]);
 					my_error[tid] += (v - black[i][j])*(v - black[i][j]);
 					black[i][j] = v;
 				}
 			/*
 			 * Red sweep
 			 */
-#pragma omp for schedule(OMP_SCHEDULING)
+#pragma omp for schedule(OMP_SCHED)
 			for (i = 1; i < m - 1; i++)
 				for (j = (i+1)%2; j < n/2 - i%2; j++) {
-					v = (black[i - 1][j] + black[i + 1][j] + black[i][j - (i+1)%2] + black[i][j + i%2]) / 4.0;
+					v = 0.25*(black[i - 1][j] + black[i + 1][j] +
+							black[i][j - (i+1)%2] + black[i][j + i%2]);
 					my_error[tid] += (v - red[i][j])*(v - red[i][j]);
 					red[i][j] = v;
 				}
@@ -565,10 +582,11 @@ double RB_GS_OmpLoopV4(double** black, double** red, int m, int n,
 			/*
 			 * Black sweep
 			 */
-#pragma omp for schedule(OMP_SCHEDULING)
+#pragma omp for schedule(OMP_SCHED)
 			for (i = 1; i < m - 1; i++)
 				for (j = i%2; j < n/2 - (i+1)%2; j++) {
-					v = (red[i - 1][j] + red[i + 1][j] + red[i][j - i%2] + red[i][j + (i+1)%2]) / 4.0;
+					v = 0.25*(red[i - 1][j] + red[i + 1][j] +
+							red[i][j - i%2] + red[i][j + (i+1)%2]);
 					black[i][j] = v;
 				}
 // implicit barrier
@@ -576,10 +594,11 @@ double RB_GS_OmpLoopV4(double** black, double** red, int m, int n,
 			/*
 			 * Red sweep
 			 */
-#pragma omp for schedule(OMP_SCHEDULING)
+#pragma omp for schedule(OMP_SCHED)
 			for (i = 1; i < m - 1; i++)
 				for (j = (i+1)%2; j < n/2 - i%2; j++) {
-					v = (black[i - 1][j] + black[i + 1][j] + black[i][j - (i+1)%2] + black[i][j + i%2]) / 4.0;
+					v = 0.25*(black[i - 1][j] + black[i + 1][j] +
+							black[i][j - (i+1)%2] + black[i][j + i%2]);
 					red[i][j] = v;
 				}
 // implicit barrier
@@ -589,10 +608,11 @@ double RB_GS_OmpLoopV4(double** black, double** red, int m, int n,
 			 * Black sweep
 			 */
 			my_diffB = 0.0;
-#pragma omp for schedule(OMP_SCHEDULING)
+#pragma omp for schedule(OMP_SCHED)
 			for (i = 1; i < m - 1; i++)
 				for (j = i%2; j < n/2 - (i+1)%2; j++) {
-					v = (red[i - 1][j] + red[i + 1][j] + red[i][j - i%2] + red[i][j + (i+1)%2]) / 4.0;
+					v = 0.25*(red[i - 1][j] + red[i + 1][j] +
+							red[i][j - i%2] + red[i][j + (i+1)%2]);
 					if (my_diffB < fabs(v - black[i][j]))
 						my_diffB = fabs(v - black[i][j]);
 					black[i][j] = v;
@@ -604,10 +624,11 @@ double RB_GS_OmpLoopV4(double** black, double** red, int m, int n,
 			 * Red sweep
 			 */
 			my_diffR = 0.0;
-#pragma omp for schedule(OMP_SCHEDULING) nowait
+#pragma omp for schedule(OMP_SCHED) nowait
 			for (i = 1; i < m - 1; i++)
 				for (j = (i+1)%2; j < n/2 - i%2; j++) {
-					v = (black[i - 1][j] + black[i + 1][j] + black[i][j - (i+1)%2] + black[i][j + i%2]) / 4.0;
+					v = 0.25*(black[i - 1][j] + black[i + 1][j] +
+							black[i][j - (i+1)%2] + black[i][j + i%2]);
 					if (my_diffR < fabs(v - red[i][j]))
 						my_diffR = fabs(v - red[i][j]);
 					red[i][j] = v;
@@ -653,10 +674,11 @@ double RB_GS_OmpLoopV4err(double** black, double** red, int m, int n,
 			/*
 			 * Black sweep
 			 */
-#pragma omp for schedule(OMP_SCHEDULING) reduction(+:error)
+#pragma omp for schedule(OMP_SCHED) reduction(+:error)
 			for (i = 1; i < m - 1; i++)
 				for (j = i%2; j < n/2 - (i+1)%2; j++) {
-					v = (red[i - 1][j] + red[i + 1][j] + red[i][j - i%2] + red[i][j + (i+1)%2]) / 4.0;
+					v = 0.25*(red[i - 1][j] + red[i + 1][j] +
+							red[i][j - i%2] + red[i][j + (i+1)%2]);
 					black[i][j] = v;
 				}
 //implicit barrier
@@ -664,10 +686,11 @@ double RB_GS_OmpLoopV4err(double** black, double** red, int m, int n,
 			/*
 			 * Red sweep
 			 */
-#pragma omp for schedule(OMP_SCHEDULING) reduction(+:error)
+#pragma omp for schedule(OMP_SCHED) reduction(+:error)
 			for (i = 1; i < m - 1; i++)
 				for (j = (i+1)%2; j < n/2 - i%2; j++) {
-					v = (black[i - 1][j] + black[i + 1][j] + black[i][j - (i+1)%2] + black[i][j + i%2]) / 4.0;
+					v = 0.25*(black[i - 1][j] + black[i + 1][j] +
+							black[i][j - (i+1)%2] + black[i][j + i%2]);
 					red[i][j] = v;
 				}
 // implicit barrier
@@ -676,10 +699,11 @@ double RB_GS_OmpLoopV4err(double** black, double** red, int m, int n,
 			 * Second iteration
 			 * Black sweep
 			 */
-#pragma omp for schedule(OMP_SCHEDULING) reduction(+:error)
+#pragma omp for schedule(OMP_SCHED) reduction(+:error)
 			for (i = 1; i < m - 1; i++)
 				for (j = i%2; j < n/2 - (i+1)%2; j++) {
-					v = (red[i - 1][j] + red[i + 1][j] + red[i][j - i%2] + red[i][j + (i+1)%2]) / 4.0;
+					v = 0.25*(red[i - 1][j] + red[i + 1][j] +
+							red[i][j - i%2] + red[i][j + (i+1)%2]);
 					error += (v - black[i][j])*(v - black[i][j]);
 					black[i][j] = v;
 				}
@@ -689,10 +713,11 @@ double RB_GS_OmpLoopV4err(double** black, double** red, int m, int n,
 			 * Second iteration
 			 * Red sweep
 			 */
-#pragma omp for schedule(OMP_SCHEDULING) reduction(+:error) nowait
+#pragma omp for schedule(OMP_SCHED) reduction(+:error) nowait
 			for (i = 1; i < m - 1; i++)
 				for (j = (i+1)%2; j < n/2 - i%2; j++) {
-					v = (black[i - 1][j] + black[i + 1][j] + black[i][j - (i+1)%2] + black[i][j + i%2]) / 4.0;
+					v = 0.25*(black[i - 1][j] + black[i + 1][j] +
+							black[i][j - (i+1)%2] + black[i][j + i%2]);
 					error += (v - red[i][j])*(v - red[i][j]);
 					red[i][j] = v;
 				}
