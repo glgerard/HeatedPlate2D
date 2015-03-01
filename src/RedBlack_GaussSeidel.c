@@ -733,7 +733,7 @@ double RedBlack_GaussSeidel(double **u, int m, int n, double eps,
 #endif
 
 	*wtime = omp_get_wtime();
-#pragma omp parallel shared(u, m, n, red, black) private(i, j,)
+#pragma omp parallel shared(u, m, n, red, black) private(i, j)
 	{
 		/*
 		 * Black sweep
